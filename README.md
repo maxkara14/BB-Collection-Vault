@@ -21,7 +21,7 @@
 
 ### Орбы
 
-Орбы берутся из скрытых блоков, которые генерирует `BB-UI-Regex-Pack`. Коллекция не заменяет Regex Pack и не отвечает за красивый рендер орбов в самом чате. Она просто находит исходные блоки, сохраняет их в метаданные текущего чата и показывает в отдельном окне.
+Орбы берутся из скрытых блоков, которые генерирует [BB-UI-Regex-Pack](https://github.com/maxkara14/BB-UI-Regex-Pack). Коллекция не заменяет Regex Pack и не отвечает за красивый рендер орбов в самом чате. Она просто находит исходные блоки, сохраняет их в метаданные текущего чата и показывает в отдельном окне.
 
 Сохраняются все орбы. Настройки редкости влияют только на уведомления, а не на саму коллекцию.
 
@@ -99,6 +99,9 @@ BBCollectionVault.store()
 BBCollectionVault.cooldown()
 BBCollectionVault.promptState()
 ```
+## Скриншоты
+
+<img width="379" height="200" alt="23456" src="https://github.com/user-attachments/assets/4212c4de-2f30-4ad4-a621-55f81a0bdaf5" />
 
 ## Установка
 
@@ -112,3 +115,7 @@ BBCollectionVault.promptState()
 
 - [BruniikBron: Lo-Fi & Mods](https://bblofi.online/)
 - [Telegram](https://t.me/Brun11kBr0n)
+
+## Благодарности
+
+Выражаю благодарность автору расширения [ST-silly-achievements](https://github.com/niemandswasser/ST-silly-achievements) за вдохновение, которое послужило основой для создания этого расширения.
