@@ -1364,11 +1364,31 @@ function clampNumber(value, min, max) {
     return Math.min(safeMax, Math.max(min, value));
 }
 
-function getClampedFabPosition(x, y, width, height) {
+function getViewportSize() {
+    const root = document.documentElement;
     return {
-        x: clampNumber(Number(x) || FAB_VIEWPORT_MARGIN, FAB_VIEWPORT_MARGIN, window.innerWidth - width - FAB_VIEWPORT_MARGIN),
-        y: clampNumber(Number(y) || 180, FAB_VIEWPORT_MARGIN, window.innerHeight - height - FAB_VIEWPORT_MARGIN),
+        width: Math.max(1, window.innerWidth || root?.clientWidth || 1),
+        height: Math.max(1, window.innerHeight || root?.clientHeight || 1),
     };
+}
+
+function getClampedFabPosition(x, y, width, height) {
+    const viewport = getViewportSize();
+    const safeWidth = Math.max(1, Number(width) || 58);
+    const safeHeight = Math.max(1, Number(height) || 42);
+    return {
+        x: clampNumber(Number(x) || FAB_VIEWPORT_MARGIN, FAB_VIEWPORT_MARGIN, viewport.width - safeWidth - FAB_VIEWPORT_MARGIN),
+        y: clampNumber(Number(y) || 180, FAB_VIEWPORT_MARGIN, viewport.height - safeHeight - FAB_VIEWPORT_MARGIN),
+    };
+}
+
+function getDefaultFabPosition(button) {
+    const viewport = getViewportSize();
+    const width = button.offsetWidth || button.getBoundingClientRect().width || 58;
+    const height = button.offsetHeight || button.getBoundingClientRect().height || 42;
+    const right = viewport.width <= 760 ? 10 : 18;
+    const bottom = viewport.width <= 760 ? 74 : 88;
+    return getClampedFabPosition(viewport.width - width - right, viewport.height - height - bottom, width, height);
 }
 
 function placeFloatingButton(button, x, y, persist = false) {
@@ -1439,8 +1459,15 @@ function renderFloatingButton() {
         applyAppearance();
         return;
     }
-    if (settings.fabX !== null && settings.fabY !== null) {
-        placeFloatingButton(button, settings.fabX, settings.fabY);
+    const hasSavedPosition = settings.fabX !== null
+        && settings.fabY !== null
+        && Number.isFinite(Number(settings.fabX))
+        && Number.isFinite(Number(settings.fabY));
+    if (hasSavedPosition) {
+        placeFloatingButton(button, settings.fabX, settings.fabY, true);
+    } else {
+        const position = getDefaultFabPosition(button);
+        placeFloatingButton(button, position.x, position.y);
     }
     applyAppearance();
 }
