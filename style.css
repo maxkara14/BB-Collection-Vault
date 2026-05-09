@@ -1,0 +1,755 @@
+#bbcv-settings {
+    margin: 12px 0;
+    border: 1px solid color-mix(in srgb, var(--bbcv-border, var(--SmartThemeBorderColor, #666)) 70%, transparent);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--bbcv-bg, var(--SmartThemeBlurTintColor, #111)) 88%, transparent);
+    overflow: hidden;
+}
+
+.bbcv-settings-head,
+.bbcv-panel-head,
+.bbcv-detail-foot,
+.bbcv-toolbar,
+.bbcv-settings-actions,
+.bbcv-settings-row,
+.bbcv-settings-quickbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.bbcv-settings-head,
+.bbcv-panel-head {
+    justify-content: space-between;
+}
+
+.bbcv-settings-head {
+    padding: 10px 12px;
+    cursor: pointer;
+}
+
+.bbcv-settings-title,
+.bbcv-panel-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 800;
+    font-size: 16px;
+}
+
+.bbcv-settings-title i,
+.bbcv-settings-tab i,
+.bbcv-icon-text i {
+    color: var(--bbcv-accent, #8fdcff);
+}
+
+.bbcv-settings-title-wrap {
+    min-width: 0;
+}
+
+.bbcv-settings-subtitle,
+.bbcv-panel-stats,
+.bbcv-detail-source,
+.bbcv-achievement-meta,
+.bbcv-orb-card-meta {
+    opacity: 0.72;
+    font-size: 12px;
+}
+
+.bbcv-settings-content {
+    padding: 10px 12px 12px;
+}
+
+.bbcv-settings-quickbar {
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+
+.bbcv-icon-text {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    min-width: 0;
+}
+
+.bbcv-icon-text span {
+    display: inline-block;
+    min-width: 0;
+}
+
+.bbcv-settings-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 8px 0 10px;
+    padding: 4px;
+    border: 1px solid color-mix(in srgb, var(--bbcv-border, #8fdcff) 70%, transparent);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--bbcv-surface, #151c2a) 74%, transparent);
+}
+
+.bbcv-settings-tab {
+    min-height: 32px;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 0 10px;
+    border: 1px solid transparent;
+    border-radius: 7px;
+    color: var(--bbcv-text, inherit);
+    background: transparent;
+    cursor: pointer;
+}
+
+.bbcv-settings-tab-active {
+    border-color: color-mix(in srgb, var(--bbcv-accent, #8fdcff) 50%, transparent);
+    background: color-mix(in srgb, var(--bbcv-accent, #8fdcff) 15%, transparent);
+}
+
+.bbcv-settings-panel[hidden] {
+    display: none;
+}
+
+.bbcv-settings-card {
+    padding: 12px;
+    border: 1px solid color-mix(in srgb, var(--bbcv-border, #8fdcff) 65%, transparent);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--bbcv-surface, #151c2a) 82%, transparent);
+}
+
+.bbcv-card-title {
+    margin-bottom: 10px;
+    color: var(--bbcv-accent, #8fdcff);
+    font-weight: 800;
+    font-size: 13px;
+}
+
+.bbcv-card-help,
+.bbcv-field-note,
+.bbcv-checkbox-field small {
+    color: var(--bbcv-muted, rgba(238, 248, 255, 0.68));
+    font-size: 11px;
+    line-height: 1.35;
+    font-weight: 400;
+}
+
+.bbcv-card-help {
+    margin: -4px 0 10px;
+}
+
+.bbcv-checkbox-field {
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.bbcv-checkbox-field > span {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+}
+
+.bbcv-checkbox-field strong {
+    color: var(--bbcv-text, inherit);
+    font-size: 12px;
+    line-height: 1.25;
+}
+
+.bbcv-settings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 8px 12px;
+    margin-top: 12px;
+}
+
+.bbcv-field {
+    display: grid;
+    gap: 4px;
+    font-size: 12px;
+}
+
+.bbcv-settings-row {
+    flex-wrap: wrap;
+    margin-top: 12px;
+}
+
+.bbcv-settings-label {
+    font-size: 12px;
+    opacity: 0.78;
+}
+
+.bbcv-rarity-toggle {
+    min-width: auto;
+}
+
+.bbcv-prompt-details {
+    margin-top: 10px;
+}
+
+.bbcv-prompt-box {
+    width: 100%;
+    min-height: 180px;
+    resize: vertical;
+    margin-top: 8px;
+}
+
+.bbcv-prompt-box-small {
+    min-height: 96px;
+}
+
+.bbcv-settings-actions {
+    flex-wrap: wrap;
+    margin-top: 12px;
+}
+
+.bbcv-debug-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.bbcv-debug-grid .bbcv-icon-text {
+    width: 100%;
+    min-height: 38px;
+    height: auto;
+    justify-content: flex-start;
+    padding: 7px 10px;
+    line-height: 1.25;
+    text-align: left;
+    white-space: normal !important;
+}
+
+.bbcv-debug-grid .bbcv-icon-text span {
+    overflow-wrap: anywhere;
+}
+
+.bbcv-toast-color-box {
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid color-mix(in srgb, var(--bbcv-border, #8fdcff) 55%, transparent);
+}
+
+.bbcv-toast-color-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 8px;
+    margin-top: 8px;
+}
+
+#bbcv-fab {
+    position: fixed;
+    right: 18px;
+    bottom: 88px;
+    z-index: 30000;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 58px;
+    height: 42px;
+    padding: 0 12px;
+    border: 1px solid color-mix(in srgb, var(--bbcv-accent, #8fdcff) 54%, transparent);
+    border-radius: 8px;
+    color: var(--bbcv-text, #effbff);
+    background: linear-gradient(145deg, color-mix(in srgb, var(--bbcv-bg, #101623) 94%, transparent), color-mix(in srgb, var(--bbcv-surface, #252f46) 94%, transparent));
+    box-shadow: 0 10px 32px rgba(0, 0, 0, 0.35), 0 0 18px color-mix(in srgb, var(--bbcv-accent, #8fdcff) 24%, transparent);
+    cursor: grab;
+}
+
+#bbcv-fab[hidden] {
+    display: none !important;
+}
+
+#bbcv-fab:active {
+    cursor: grabbing;
+}
+
+.bbcv-fab-icon {
+    font-size: 15px;
+    color: var(--bbcv-accent, #9ee8ff);
+}
+
+.bbcv-fab-count {
+    min-width: 20px;
+    height: 20px;
+    display: inline-grid;
+    place-items: center;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--bbcv-accent, #9ee8ff) 18%, transparent);
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.bbcv-panel[hidden] {
+    display: none;
+}
+
+.bbcv-panel {
+    position: fixed;
+    inset: 0;
+    z-index: 30010;
+}
+
+.bbcv-panel-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.48);
+    backdrop-filter: blur(3px);
+}
+
+.bbcv-panel-shell {
+    position: absolute;
+    top: min(8vh, 64px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(1040px, calc(100vw - 24px));
+    max-height: min(820px, calc(100vh - 48px));
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid var(--bbcv-border, rgba(160, 220, 255, 0.26));
+    border-radius: 8px;
+    background: var(--bbcv-bg, rgba(13, 17, 25, 0.96));
+    color: var(--bbcv-text, #eef8ff);
+    box-shadow: 0 28px 88px rgba(0, 0, 0, 0.55);
+}
+
+.bbcv-panel-head {
+    padding: 14px 16px 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.bbcv-icon-button {
+    width: 34px;
+    height: 34px;
+    display: inline-grid;
+    place-items: center;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 7px;
+    color: inherit;
+    background: rgba(255, 255, 255, 0.06);
+    cursor: pointer;
+}
+
+.bbcv-tabs {
+    display: flex;
+    gap: 6px;
+    padding: 10px 14px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.bbcv-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 34px;
+    padding: 0 12px;
+    border: 1px solid transparent;
+    border-radius: 7px;
+    color: #dceeff;
+    background: transparent;
+    cursor: pointer;
+}
+
+.bbcv-tab-active {
+    border-color: color-mix(in srgb, var(--bbcv-accent, #8fdcff) 42%, transparent);
+    background: color-mix(in srgb, var(--bbcv-accent, #8fdcff) 13%, transparent);
+}
+
+.bbcv-panel-body {
+    min-height: 0;
+    overflow: auto;
+    padding: 14px;
+}
+
+.bbcv-view[hidden] {
+    display: none;
+}
+
+.bbcv-toolbar {
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+}
+
+.bbcv-search {
+    flex: 1 1 260px;
+    min-width: 220px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 10px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.bbcv-search input {
+    width: 100%;
+    border: 0;
+    outline: 0;
+    color: inherit;
+    background: transparent;
+}
+
+.bbcv-orb-layout {
+    display: grid;
+    grid-template-columns: minmax(260px, 1fr) minmax(300px, 380px);
+    gap: 14px;
+    align-items: start;
+}
+
+.bbcv-orb-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 10px;
+}
+
+.bbcv-orb-card {
+    width: 100%;
+    min-height: 78px;
+    display: grid;
+    grid-template-columns: 52px minmax(0, 1fr);
+    gap: 10px;
+    align-items: center;
+    padding: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    color: inherit;
+    text-align: left;
+    background: linear-gradient(140deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
+    cursor: pointer;
+}
+
+.bbcv-orb-card-active {
+    border-color: color-mix(in srgb, var(--g) 70%, white 10%);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--g) 36%, transparent), 0 0 24px color-mix(in srgb, var(--g) 22%, transparent);
+}
+
+.bbcv-mini-orb,
+.bbcv-large-orb,
+.bbcv-toast-orb-icon {
+    display: block;
+    border-radius: 50%;
+    background:
+        radial-gradient(circle at 34% 26%, rgba(255, 255, 255, 0.95) 0 7%, transparent 14%),
+        radial-gradient(circle at 66% 68%, var(--a), transparent 42%),
+        radial-gradient(circle at 30% 70%, var(--b), transparent 44%),
+        conic-gradient(from 120deg, var(--a), var(--g), var(--b), var(--a));
+    box-shadow:
+        inset 8px 8px 16px rgba(255, 255, 255, 0.24),
+        inset -12px -12px 22px rgba(0, 0, 0, 0.28),
+        0 0 18px var(--g);
+}
+
+.bbcv-mini-orb {
+    width: 44px;
+    height: 44px;
+}
+
+.bbcv-large-orb {
+    width: 86px;
+    height: 86px;
+}
+
+.bbcv-orb-card-copy {
+    min-width: 0;
+    display: grid;
+    gap: 4px;
+}
+
+.bbcv-orb-card-title,
+.bbcv-achievement-title,
+.bbcv-toast-title {
+    overflow-wrap: anywhere;
+    font-weight: 800;
+}
+
+.bbcv-orb-detail {
+    position: sticky;
+    top: 0;
+    min-height: 280px;
+    padding: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--bbcv-surface, #151c2a) 82%, transparent);
+}
+
+.bbcv-orb-detail-head {
+    display: grid;
+    grid-template-columns: 92px minmax(0, 1fr);
+    gap: 12px;
+    align-items: center;
+}
+
+.bbcv-orb-detail h3 {
+    margin: 4px 0;
+    font-size: 20px;
+    line-height: 1.22;
+}
+
+.bbcv-detail-kicker {
+    color: var(--g);
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.bbcv-detail-text {
+    margin-top: 14px;
+    max-height: 330px;
+    overflow: auto;
+    padding-right: 4px;
+    color: rgba(238, 248, 255, 0.92);
+    line-height: 1.58;
+    overflow-wrap: anywhere;
+}
+
+.bbcv-detail-foot {
+    justify-content: space-between;
+    flex-wrap: wrap;
+    margin-top: 14px;
+    color: rgba(238, 248, 255, 0.66);
+    font-size: 12px;
+}
+
+.bbcv-achievements-list {
+    display: grid;
+    gap: 10px;
+}
+
+.bbcv-achievement-item {
+    display: grid;
+    grid-template-columns: 52px minmax(0, 1fr) 36px;
+    gap: 12px;
+    align-items: center;
+    padding: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--bbcv-surface, #151c2a) 82%, transparent);
+}
+
+.bbcv-achievement-emoji,
+.bbcv-toast-achievement-icon {
+    width: 42px;
+    height: 42px;
+    display: grid;
+    place-items: center;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.08);
+    font-size: 22px;
+}
+
+.bbcv-achievement-copy {
+    min-width: 0;
+    display: grid;
+    gap: 4px;
+}
+
+.bbcv-achievement-desc {
+    opacity: 0.86;
+    overflow-wrap: anywhere;
+}
+
+.bbcv-empty {
+    padding: 18px;
+    border: 1px dashed rgba(255, 255, 255, 0.16);
+    border-radius: 8px;
+    color: rgba(238, 248, 255, 0.72);
+    text-align: center;
+}
+
+#bbcv-toast-container {
+    position: fixed;
+    top: 14px;
+    right: 12px;
+    z-index: 30020;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 10px;
+    pointer-events: none;
+}
+
+.bbcv-toast {
+    width: min(390px, calc(100vw - 24px));
+    display: grid;
+    grid-template-columns: 54px minmax(0, 1fr);
+    gap: 12px;
+    align-items: center;
+    padding: 12px;
+    border: 1px solid var(--bbcv-border, rgba(143, 220, 255, 0.3));
+    border-radius: 8px;
+    color: var(--bbcv-text, #eef8ff);
+    background: var(--bbcv-bg, rgba(13, 17, 25, 0.96));
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
+    opacity: 0;
+    transform: translateX(24px) scale(var(--bbcv-toast-scale, 1));
+    transform-origin: top right;
+    transition: opacity 0.22s ease, transform 0.22s ease;
+    pointer-events: auto;
+}
+
+.bbcv-toast-show {
+    opacity: 1;
+    transform: translateX(0) scale(var(--bbcv-toast-scale, 1));
+}
+
+.bbcv-toast-orb-icon {
+    width: 46px;
+    height: 46px;
+}
+
+.bbcv-toast-copy {
+    min-width: 0;
+    display: grid;
+    gap: 3px;
+}
+
+.bbcv-toast-kicker {
+    color: var(--bbcv-accent, #9ee8ff);
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.bbcv-toast-desc {
+    opacity: 0.78;
+    font-size: 12px;
+    overflow-wrap: anywhere;
+}
+
+.bbcv-toast-rarity-rare {
+    border-color: rgba(115, 185, 255, 0.58);
+}
+
+.bbcv-toast-rarity-anomaly {
+    border-color: rgba(255, 114, 224, 0.62);
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45), 0 0 28px rgba(255, 114, 224, 0.22);
+}
+
+.bbcv-achievement-rare,
+.bbcv-toast-achievement.bbcv-achievement-rare {
+    border-color: rgba(107, 190, 255, 0.34);
+}
+
+.bbcv-achievement-epic,
+.bbcv-toast-achievement.bbcv-achievement-epic {
+    border-color: rgba(190, 128, 255, 0.42);
+}
+
+.bbcv-achievement-legendary,
+.bbcv-toast-achievement.bbcv-achievement-legendary {
+    border-color: rgba(255, 204, 92, 0.52);
+}
+
+.bbcv-theme-glass .bbcv-panel-shell,
+#bbcv-toast-container.bbcv-theme-glass .bbcv-toast,
+#bbcv-settings.bbcv-theme-glass {
+    backdrop-filter: blur(10px);
+}
+
+.bbcv-theme-ember .bbcv-fab-icon,
+.bbcv-theme-ember .bbcv-settings-title i,
+.bbcv-theme-ember .bbcv-settings-tab i {
+    color: #ffb278;
+}
+
+.bbcv-theme-mono .bbcv-mini-orb,
+.bbcv-theme-mono .bbcv-large-orb {
+    filter: saturate(0.35);
+}
+
+.bbcv-density-compact .bbcv-panel-body {
+    padding: 10px;
+}
+
+.bbcv-density-compact .bbcv-orb-grid {
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 8px;
+}
+
+.bbcv-density-compact .bbcv-orb-card {
+    min-height: 62px;
+    grid-template-columns: 42px minmax(0, 1fr);
+    padding: 8px;
+}
+
+.bbcv-density-compact .bbcv-mini-orb {
+    width: 34px;
+    height: 34px;
+}
+
+.bbcv-density-wide .bbcv-panel-shell {
+    width: min(1180px, calc(100vw - 24px));
+}
+
+.bbcv-density-wide .bbcv-orb-grid {
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+}
+
+@media (max-width: 760px) {
+    .bbcv-settings-content {
+        padding: 8px;
+    }
+
+    .bbcv-settings-grid,
+    .bbcv-toast-color-grid,
+    .bbcv-debug-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .bbcv-settings-quickbar .bbcv-icon-text,
+    .bbcv-debug-grid .bbcv-icon-text {
+        width: 100%;
+    }
+
+    .bbcv-settings-tab {
+        flex: 1 1 128px;
+        justify-content: center;
+        min-width: 0;
+    }
+
+    .bbcv-panel-shell {
+        top: 10px;
+        width: calc(100vw - 16px);
+        max-height: calc(100vh - 20px);
+    }
+
+    .bbcv-orb-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .bbcv-orb-detail {
+        position: static;
+    }
+
+    #bbcv-toast-container {
+        left: 12px;
+        right: 12px;
+        align-items: stretch;
+    }
+
+    #bbcv-fab {
+        right: max(10px, env(safe-area-inset-right, 0px));
+        bottom: calc(74px + env(safe-area-inset-bottom, 0px));
+        min-width: 50px;
+        height: 38px;
+        padding: 0 10px;
+    }
+}
+
+@media (max-width: 380px) {
+    #bbcv-fab {
+        min-width: 44px;
+        gap: 6px;
+        padding: 0 8px;
+    }
+
+    .bbcv-fab-count {
+        min-width: 18px;
+        height: 18px;
+        font-size: 11px;
+    }
+}
