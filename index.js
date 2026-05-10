@@ -389,7 +389,7 @@ function parseKeyedOrbBlock(body) {
     const raw = String(body || '').replace(/\r/g, '').trim();
     if (!raw) return null;
 
-    const textMatch = raw.match(/(?:^|\n)Text:\s*([\s\S]*)$/i);
+    const textMatch = raw.match(/(?:^|\n)(?:Text|\u0422\u0435\u043a\u0441\u0442):\s*([\s\S]*)$/i);
     const header = textMatch ? raw.slice(0, textMatch.index).trim() : raw;
     const text = textMatch ? normalizeText(textMatch[1]) : '';
     const fields = {};
