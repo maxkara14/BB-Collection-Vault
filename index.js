@@ -540,6 +540,39 @@ function parseAchievementsFromMessage(message, messageIndex) {
     return results;
 }
 
+function stripAchievementMarkersFromText(text) {
+    const original = String(text ?? '');
+    if (!original.includes('[ACHIEVEMENT:')) return original;
+    ACHIEVEMENT_HIDE_REGEX.lastIndex = 0;
+    return original
+        .replace(ACHIEVEMENT_HIDE_REGEX, '')
+        .replace(/[ \t]+\n/g, '\n')
+        .replace(/\n{3,}/g, '\n\n')
+        .trimEnd();
+}
+
+function stripAchievementMarkersFromMessage(message) {
+    if (!message) return false;
+    let changed = false;
+    for (const key of ['mes', 'message']) {
+        if (typeof message[key] !== 'string') continue;
+        const next = stripAchievementMarkersFromText(message[key]);
+        if (next !== message[key]) {
+            message[key] = next;
+            changed = true;
+        }
+    }
+    const swipeIndex = Number(message.swipe_id);
+    if (Array.isArray(message.swipes) && Number.isInteger(swipeIndex) && typeof message.swipes[swipeIndex] === 'string') {
+        const next = stripAchievementMarkersFromText(message.swipes[swipeIndex]);
+        if (next !== message.swipes[swipeIndex]) {
+            message.swipes[swipeIndex] = next;
+            changed = true;
+        }
+    }
+    return changed;
+}
+
 function achievementContentKey(achievement) {
     return [
         normalizeText(achievement?.title).toLowerCase(),
@@ -659,6 +692,7 @@ function scanChat({ notify = false, rebuild = false } = {}) {
     const knownAchievementContent = new Set(store.achievements.map(achievementContentKey));
     const addedOrbs = [];
     const addedAchievements = [];
+    let strippedAchievementMarkers = 0;
     let lastAcceptedAchievementMessageIndex = getLastAcceptedChatAchievementIndex(store);
 
     for (let i = 0; i < chat.length; i += 1) {
@@ -676,7 +710,8 @@ function scanChat({ notify = false, rebuild = false } = {}) {
         }
 
         if (settings.achievementsEnabled) {
-            for (const achievement of parseAchievementsFromMessage(message, i)) {
+            const parsedAchievements = parseAchievementsFromMessage(message, i);
+            for (const achievement of parsedAchievements) {
                 if (ignoredAchievementHashes.has(achievement.hash)) continue;
                 if (knownAchievementHashes.has(achievement.hash)) continue;
                 const contentKey = achievementContentKey(achievement);
@@ -698,10 +733,13 @@ function scanChat({ notify = false, rebuild = false } = {}) {
                 addedAchievements.push(achievement);
                 lastAcceptedAchievementMessageIndex = i;
             }
+            if (stripAchievementMarkersFromMessage(message)) {
+                strippedAchievementMarkers += 1;
+            }
         }
     }
 
-    if (addedOrbs.length || addedAchievements.length || removedOrbs.length || rebuild) {
+    if (addedOrbs.length || addedAchievements.length || removedOrbs.length || strippedAchievementMarkers || rebuild) {
         store.orbs.sort((a, b) => Number(a.createdAt || 0) - Number(b.createdAt || 0));
         store.achievements.sort((a, b) => Number(a.createdAt || 0) - Number(b.createdAt || 0));
         persistChat();
@@ -720,8 +758,8 @@ function scanChat({ notify = false, rebuild = false } = {}) {
         }
     }
 
-    if (settings.debugVerbose && (addedOrbs.length || addedAchievements.length || removedOrbs.length || rebuild)) {
-        console.info(`[${MODULE_NAME}] scan`, { rebuild, addedOrbs, removedOrbs, addedAchievements, stats: getStats(store) });
+    if (settings.debugVerbose && (addedOrbs.length || addedAchievements.length || removedOrbs.length || strippedAchievementMarkers || rebuild)) {
+        console.info(`[${MODULE_NAME}] scan`, { rebuild, addedOrbs, removedOrbs, addedAchievements, strippedAchievementMarkers, stats: getStats(store) });
     }
 
     renderFloatingButton();
@@ -829,7 +867,7 @@ function hideAchievementMarkersInDOM() {
         for (const node of nodes) {
             const original = node.nodeValue || '';
             if (!original.includes('[ACHIEVEMENT:')) continue;
-            const next = original.replace(ACHIEVEMENT_HIDE_REGEX, '').replace(/\n{3,}/g, '\n\n');
+            const next = stripAchievementMarkersFromText(original);
             if (next !== original) node.nodeValue = next;
         }
     }
