@@ -165,6 +165,7 @@ let scanShouldNotify = false;
 let scanNotifyUntil = 0;
 let hideTimer = null;
 let observer = null;
+let hideObserverPaused = false;
 let fabDrag = null;
 let audioContext = null;
 
@@ -239,6 +240,7 @@ function ensureStore() {
             version: 1,
             orbs: [],
             achievements: [],
+            achievementSources: [],
             ignoredOrbHashes: [],
             ignoredAchievementHashes: [],
         };
@@ -246,6 +248,7 @@ function ensureStore() {
     const store = context.chatMetadata[META_KEY];
     if (!Array.isArray(store.orbs)) store.orbs = [];
     if (!Array.isArray(store.achievements)) store.achievements = [];
+    if (!Array.isArray(store.achievementSources)) store.achievementSources = [];
     if (!Array.isArray(store.ignoredOrbHashes)) store.ignoredOrbHashes = [];
     if (!Array.isArray(store.ignoredAchievementHashes)) store.ignoredAchievementHashes = [];
     return store;
@@ -448,16 +451,27 @@ function parseOrbsFromMessage(message, messageIndex) {
     return results;
 }
 
-function getMessageStableKey(message, messageIndex) {
+function getMessageStableKey(message, messageIndex, swipeId = message?.swipe_id ?? 0) {
+    const swipeInfo = Array.isArray(message?.swipe_info) ? message.swipe_info[Number(swipeId)] : null;
     const parts = [
-        message?.send_date || '',
-        message?.gen_started || '',
-        message?.gen_finished || '',
+        swipeInfo?.send_date || message?.send_date || '',
+        swipeInfo?.gen_started || message?.gen_started || '',
+        swipeInfo?.gen_finished || message?.gen_finished || '',
         message?.name || message?.original_name || '',
-        message?.swipe_id ?? 0,
+        swipeId,
     ].map((part) => String(part || '').trim());
     const key = parts.join('|');
     return key.replace(/\|/g, '') ? key : `message_${messageIndex}`;
+}
+
+function addExistingMessageKeys(targetSet, message, messageIndex) {
+    targetSet.add(getMessageStableKey(message, messageIndex));
+    if (!Array.isArray(message?.swipes)) return;
+    for (let swipeIndex = 0; swipeIndex < message.swipes.length; swipeIndex += 1) {
+        if (typeof message.swipes[swipeIndex] === 'string') {
+            targetSet.add(getMessageStableKey(message, messageIndex, swipeIndex));
+        }
+    }
 }
 
 function getOrbContentHash(orb) {
@@ -522,14 +536,20 @@ function parseAchievementsFromMessage(message, messageIndex) {
     const results = [];
     ACHIEVEMENT_REGEX.lastIndex = 0;
     for (const match of text.matchAll(ACHIEVEMENT_REGEX)) {
+        const messageKey = getMessageStableKey(message, messageIndex);
+        const sourceHash = hashString([messageKey, match[0]].join('|'));
         const achievement = {
-            id: `chat_${messageIndex}_${hashString(match[0])}`,
-            hash: hashString([messageIndex, message?.swipe_id ?? 0, message?.send_date ?? '', match[0]].join('|')),
+            id: `chat_${sourceHash}`,
+            hash: sourceHash,
+            sourceHash,
             source: 'chat',
             emoji: normalizeText(match[1]) || '🏆',
             title: normalizeText(match[2]),
             description: normalizeText(match[3]),
             rarity: normalizeAchievementRarity(match[4]),
+            raw: match[0],
+            messageKey,
+            messageLinked: true,
             messageIndex,
             createdAt: getMessageTimestamp(message, messageIndex),
         };
@@ -579,6 +599,146 @@ function achievementContentKey(achievement) {
         normalizeText(achievement?.description).toLowerCase(),
         normalizeAchievementRarity(achievement?.rarity),
     ].join('|');
+}
+
+function getAchievementSourceHash(achievement) {
+    if (achievement?.sourceHash) return String(achievement.sourceHash);
+    if (achievement?.messageKey && achievement?.raw) {
+        return hashString([achievement.messageKey, achievement.raw].join('|'));
+    }
+    if (achievement?.hash) return String(achievement.hash);
+    if (achievement?.id) return String(achievement.id);
+    return hashString([
+        achievement?.messageKey || '',
+        achievementContentKey(achievement),
+    ].join('|'));
+}
+
+function achievementSourceFromAchievement(achievement) {
+    const sourceHash = getAchievementSourceHash(achievement);
+    return {
+        sourceHash,
+        hash: sourceHash,
+        id: achievement.id || `chat_${sourceHash}`,
+        source: 'chat',
+        emoji: achievement.emoji || 'рџЏ†',
+        title: achievement.title || '',
+        description: achievement.description || '',
+        rarity: normalizeAchievementRarity(achievement.rarity),
+        raw: achievement.raw || '',
+        messageKey: achievement.messageKey || '',
+        messageLinked: true,
+        messageIndex: achievement.messageIndex,
+        createdAt: Number(achievement.createdAt || 0) || Date.now(),
+    };
+}
+
+function achievementFromSource(source) {
+    const sourceHash = getAchievementSourceHash(source);
+    return {
+        id: source.id || `chat_${sourceHash}`,
+        hash: sourceHash,
+        sourceHash,
+        source: 'chat',
+        emoji: source.emoji || 'рџЏ†',
+        title: source.title || '',
+        description: source.description || '',
+        rarity: normalizeAchievementRarity(source.rarity),
+        raw: source.raw || '',
+        messageKey: source.messageKey || '',
+        messageLinked: true,
+        messageIndex: source.messageIndex,
+        createdAt: Number(source.createdAt || 0) || Date.now(),
+        restoredFromSource: !!source.restoredFromSource,
+    };
+}
+
+function upsertAchievementSource(store, achievement) {
+    if (!store || achievement?.source !== 'chat' || !achievement.messageKey) return false;
+    const source = achievementSourceFromAchievement(achievement);
+    const index = store.achievementSources.findIndex((item) => getAchievementSourceHash(item) === source.sourceHash);
+    if (index >= 0) {
+        store.achievementSources[index] = { ...store.achievementSources[index], ...source };
+        return false;
+    }
+    store.achievementSources.push(source);
+    return true;
+}
+
+function migrateAchievementSourcesFromAchievements(store) {
+    if (!store) return 0;
+    let changed = 0;
+    for (const achievement of store.achievements) {
+        if (achievement?.source !== 'chat' || !achievement.messageKey) continue;
+        if (!achievement.title || !achievement.description) continue;
+        const sourceHash = getAchievementSourceHash(achievement);
+        if (achievement.sourceHash !== sourceHash) {
+            achievement.sourceHash = sourceHash;
+            changed += 1;
+        }
+        if (!achievement.hash) {
+            achievement.hash = sourceHash;
+            changed += 1;
+        }
+        if (achievement.messageLinked === undefined) {
+            achievement.messageLinked = true;
+            changed += 1;
+        }
+        if (upsertAchievementSource(store, achievement)) changed += 1;
+    }
+    return changed;
+}
+
+function pruneMissingAchievementSources(store, currentMessageKeys) {
+    const removed = [];
+    const kept = [];
+    for (const source of store.achievementSources) {
+        if (source?.messageKey && currentMessageKeys.has(String(source.messageKey))) {
+            kept.push(source);
+        } else {
+            removed.push(source);
+        }
+    }
+    if (removed.length) {
+        store.achievementSources = kept;
+    }
+    return removed;
+}
+
+function getCurrentAchievementSources(store, currentMessageKeys) {
+    return store.achievementSources
+        .filter((source) => source?.messageKey && currentMessageKeys.has(String(source.messageKey)))
+        .map((source) => achievementFromSource({ ...source, restoredFromSource: true }))
+        .filter((achievement) => achievement.title && achievement.description);
+}
+
+function pruneMissingAchievements(store, currentSourceHashes) {
+    const removed = [];
+    const kept = [];
+    for (const achievement of store.achievements) {
+        if (achievement?.source !== 'chat') {
+            kept.push(achievement);
+            continue;
+        }
+        if (!achievement.messageKey) {
+            kept.push(achievement);
+            continue;
+        }
+        if (!achievement.sourceHash) {
+            kept.push(achievement);
+            continue;
+        }
+        const sourceHash = getAchievementSourceHash(achievement);
+        if (currentSourceHashes.has(sourceHash)) {
+            kept.push(achievement);
+        } else {
+            removed.push(achievement);
+        }
+    }
+    if (removed.length) {
+        store.achievements = kept;
+    }
+    return removed;
 }
 
 function getLastAcceptedChatAchievementIndex(store = ensureStore()) {
@@ -660,27 +820,44 @@ function scanChat({ notify = false, rebuild = false } = {}) {
     const settings = getSettings();
     const context = getContext();
     const store = ensureStore();
-    if (!context || !store) return { addedOrbs: [], addedAchievements: [] };
+    if (!context || !store) return { addedOrbs: [], removedOrbs: [], addedAchievements: [], removedAchievements: [] };
 
     if (rebuild) {
         store.orbs = [];
-        store.achievements = store.achievements.filter((item) => item.source === 'manual');
+        // Achievement markers are stripped from saved messages after collection.
+        // Keep stored achievements and prune only entries with live source links below.
     }
 
     const chat = Array.isArray(context.chat) ? context.chat : [];
     const parsedOrbsByMessage = new Map();
+    const parsedAchievementsByMessage = new Map();
     const currentOrbKeys = new Set();
-    if (settings.collectOrbs) {
-        for (let i = 0; i < chat.length; i += 1) {
-            const message = chat[i];
-            if (!message || message.is_user) continue;
+    const visibleMessageKeys = new Set();
+    const existingMessageKeys = new Set();
+    for (let i = 0; i < chat.length; i += 1) {
+        const message = chat[i];
+        if (!message || message.is_user) continue;
+        visibleMessageKeys.add(getMessageStableKey(message, i));
+        addExistingMessageKeys(existingMessageKeys, message, i);
+
+        if (settings.collectOrbs) {
             const parsedOrbs = parseOrbsFromMessage(message, i);
             parsedOrbsByMessage.set(i, parsedOrbs);
             for (const orb of parsedOrbs) addOrbKeys(currentOrbKeys, orb);
         }
+
+        if (settings.achievementsEnabled) {
+            parsedAchievementsByMessage.set(i, parseAchievementsFromMessage(message, i));
+        }
     }
 
     const removedOrbs = settings.collectOrbs ? pruneMissingOrbs(store, currentOrbKeys) : [];
+    const migratedAchievementSources = settings.achievementsEnabled
+        ? migrateAchievementSourcesFromAchievements(store)
+        : 0;
+    const removedAchievementSources = settings.achievementsEnabled
+        ? pruneMissingAchievementSources(store, existingMessageKeys)
+        : [];
     const ignoredOrbHashes = new Set(store.ignoredOrbHashes || []);
     const ignoredAchievementHashes = new Set(store.ignoredAchievementHashes || []);
     const knownOrbHashes = new Set();
@@ -688,10 +865,28 @@ function scanChat({ notify = false, rebuild = false } = {}) {
         normalizeStoredOrbIdentity(orb);
         addOrbKeys(knownOrbHashes, orb);
     }
+
+    const achievementCandidates = new Map();
+    if (settings.achievementsEnabled) {
+        for (const source of getCurrentAchievementSources(store, visibleMessageKeys)) {
+            achievementCandidates.set(getAchievementSourceHash(source), source);
+        }
+        for (const parsedAchievements of parsedAchievementsByMessage.values()) {
+            for (const achievement of parsedAchievements) {
+                achievementCandidates.set(getAchievementSourceHash(achievement), achievement);
+            }
+        }
+    }
+    const currentAchievementSourceHashes = new Set(achievementCandidates.keys());
+    const removedAchievements = settings.achievementsEnabled
+        ? pruneMissingAchievements(store, currentAchievementSourceHashes)
+        : [];
     const knownAchievementHashes = new Set(store.achievements.map((achievement) => achievement.hash));
     const knownAchievementContent = new Set(store.achievements.map(achievementContentKey));
     const addedOrbs = [];
     const addedAchievements = [];
+    let addedAchievementSources = 0;
+    let restoredAchievements = 0;
     let strippedAchievementMarkers = 0;
     let lastAcceptedAchievementMessageIndex = getLastAcceptedChatAchievementIndex(store);
 
@@ -710,36 +905,53 @@ function scanChat({ notify = false, rebuild = false } = {}) {
         }
 
         if (settings.achievementsEnabled) {
-            const parsedAchievements = parseAchievementsFromMessage(message, i);
-            for (const achievement of parsedAchievements) {
-                if (ignoredAchievementHashes.has(achievement.hash)) continue;
-                if (knownAchievementHashes.has(achievement.hash)) continue;
-                const contentKey = achievementContentKey(achievement);
-                if (settings.dedupeAchievements && knownAchievementContent.has(contentKey)) continue;
-                if (isAchievementBlockedByCooldown(i, lastAcceptedAchievementMessageIndex, settings)) {
-                    if (settings.debugVerbose) {
-                        console.info(`[${MODULE_NAME}] achievement skipped by local cooldown`, {
-                            title: achievement.title,
-                            messageIndex: i,
-                            lastAcceptedAchievementMessageIndex,
-                            cooldown: settings.achievementCooldown,
-                        });
-                    }
-                    continue;
-                }
-                knownAchievementHashes.add(achievement.hash);
-                knownAchievementContent.add(contentKey);
-                store.achievements.push(achievement);
-                addedAchievements.push(achievement);
-                lastAcceptedAchievementMessageIndex = i;
-            }
             if (stripAchievementMarkersFromMessage(message)) {
                 strippedAchievementMarkers += 1;
             }
         }
     }
 
-    if (addedOrbs.length || addedAchievements.length || removedOrbs.length || strippedAchievementMarkers || rebuild) {
+    if (settings.achievementsEnabled) {
+        const sortedCandidates = [...achievementCandidates.values()]
+            .map(achievementFromSource)
+            .sort((a, b) => Number(a.messageIndex ?? 0) - Number(b.messageIndex ?? 0)
+                || Number(a.createdAt || 0) - Number(b.createdAt || 0));
+        for (const achievement of sortedCandidates) {
+            if (ignoredAchievementHashes.has(achievement.hash)) continue;
+            if (knownAchievementHashes.has(achievement.hash)) {
+                if (upsertAchievementSource(store, achievement)) addedAchievementSources += 1;
+                continue;
+            }
+            if (achievement.restoredFromSource) {
+                knownAchievementHashes.add(achievement.hash);
+                knownAchievementContent.add(achievementContentKey(achievement));
+                store.achievements.push(achievement);
+                restoredAchievements += 1;
+                continue;
+            }
+            const contentKey = achievementContentKey(achievement);
+            if (settings.dedupeAchievements && knownAchievementContent.has(contentKey)) continue;
+            if (isAchievementBlockedByCooldown(achievement.messageIndex, lastAcceptedAchievementMessageIndex, settings)) {
+                if (settings.debugVerbose) {
+                    console.info(`[${MODULE_NAME}] achievement skipped by local cooldown`, {
+                        title: achievement.title,
+                        messageIndex: achievement.messageIndex,
+                        lastAcceptedAchievementMessageIndex,
+                        cooldown: settings.achievementCooldown,
+                    });
+                }
+                continue;
+            }
+            knownAchievementHashes.add(achievement.hash);
+            knownAchievementContent.add(contentKey);
+            if (upsertAchievementSource(store, achievement)) addedAchievementSources += 1;
+            store.achievements.push(achievement);
+            addedAchievements.push(achievement);
+            lastAcceptedAchievementMessageIndex = Number(achievement.messageIndex);
+        }
+    }
+
+    if (addedOrbs.length || addedAchievements.length || addedAchievementSources || restoredAchievements || migratedAchievementSources || removedOrbs.length || removedAchievements.length || removedAchievementSources.length || strippedAchievementMarkers || rebuild) {
         store.orbs.sort((a, b) => Number(a.createdAt || 0) - Number(b.createdAt || 0));
         store.achievements.sort((a, b) => Number(a.createdAt || 0) - Number(b.createdAt || 0));
         persistChat();
@@ -758,14 +970,14 @@ function scanChat({ notify = false, rebuild = false } = {}) {
         }
     }
 
-    if (settings.debugVerbose && (addedOrbs.length || addedAchievements.length || removedOrbs.length || strippedAchievementMarkers || rebuild)) {
-        console.info(`[${MODULE_NAME}] scan`, { rebuild, addedOrbs, removedOrbs, addedAchievements, strippedAchievementMarkers, stats: getStats(store) });
+    if (settings.debugVerbose && (addedOrbs.length || addedAchievements.length || addedAchievementSources || restoredAchievements || migratedAchievementSources || removedOrbs.length || removedAchievements.length || removedAchievementSources.length || strippedAchievementMarkers || rebuild)) {
+        console.info(`[${MODULE_NAME}] scan`, { rebuild, addedOrbs, removedOrbs, addedAchievements, restoredAchievements, migratedAchievementSources, removedAchievements, removedAchievementSources, strippedAchievementMarkers, stats: getStats(store) });
     }
 
     renderFloatingButton();
     renderPanel();
     syncSettingsControls();
-    return { addedOrbs, removedOrbs, addedAchievements };
+    return { addedOrbs, removedOrbs, addedAchievements, removedAchievements };
 }
 
 function scheduleScan(notify = false, { resetNotify = false } = {}) {
@@ -784,7 +996,10 @@ function scheduleScan(notify = false, { resetNotify = false } = {}) {
         const notifyNow = scanShouldNotify || Date.now() <= scanNotifyUntil;
         scanShouldNotify = false;
         const result = scanChat({ notify: notifyNow });
-        const changed = result.addedOrbs.length > 0 || result.addedAchievements.length > 0 || result.removedOrbs.length > 0;
+        const changed = result.addedOrbs.length > 0
+            || result.addedAchievements.length > 0
+            || result.removedOrbs.length > 0
+            || result.removedAchievements.length > 0;
         if (notifyNow && changed) {
             scanNotifyUntil = 0;
         } else if (notifyNow && Date.now() <= scanNotifyUntil) {
@@ -852,31 +1067,77 @@ function applyPromptInjection() {
 
 function scheduleHideAchievementMarkers() {
     window.clearTimeout(hideTimer);
+    hideAchievementMarkersInDOM();
     hideTimer = window.setTimeout(() => {
         hideTimer = null;
         hideAchievementMarkersInDOM();
-    }, 80);
+    }, 120);
 }
 
 function hideAchievementMarkersInDOM() {
     const containers = document.querySelectorAll('.mes_text, .message_text');
     for (const container of containers) {
-        const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
-        const nodes = [];
-        while (walker.nextNode()) nodes.push(walker.currentNode);
-        for (const node of nodes) {
-            const original = node.nodeValue || '';
-            if (!original.includes('[ACHIEVEMENT:')) continue;
-            const next = stripAchievementMarkersFromText(original);
-            if (next !== original) node.nodeValue = next;
-        }
+        stripAchievementMarkersFromElement(container);
     }
 }
 
 function ensureHideObserver() {
     if (observer) return;
-    observer = new MutationObserver(scheduleHideAchievementMarkers);
+    observer = new MutationObserver(() => {
+        if (!hideObserverPaused) scheduleHideAchievementMarkers();
+    });
     observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+}
+
+function getTextNodes(root) {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const nodes = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+    return nodes;
+}
+
+function getTextRangePosition(nodes, targetOffset) {
+    let offset = 0;
+    for (const node of nodes) {
+        const length = node.nodeValue?.length || 0;
+        if (targetOffset <= offset + length) {
+            return { node, offset: Math.max(0, targetOffset - offset) };
+        }
+        offset += length;
+    }
+    const fallback = nodes[nodes.length - 1];
+    return fallback ? { node: fallback, offset: fallback.nodeValue?.length || 0 } : null;
+}
+
+function stripAchievementMarkersFromElement(root) {
+    let changed = false;
+    for (let guard = 0; guard < 20; guard += 1) {
+        const text = root.textContent || '';
+        if (!text.includes('[ACHIEVEMENT:')) break;
+        ACHIEVEMENT_HIDE_REGEX.lastIndex = 0;
+        const match = ACHIEVEMENT_HIDE_REGEX.exec(text);
+        if (!match) break;
+
+        const nodes = getTextNodes(root);
+        const start = getTextRangePosition(nodes, match.index);
+        const end = getTextRangePosition(nodes, match.index + match[0].length);
+        if (!start || !end) break;
+
+        const range = document.createRange();
+        range.setStart(start.node, start.offset);
+        range.setEnd(end.node, end.offset);
+        hideObserverPaused = true;
+        try {
+            range.deleteContents();
+            root.normalize();
+        } finally {
+            range.detach();
+            hideObserverPaused = false;
+        }
+        changed = true;
+    }
+    if (hideObserverPaused) hideObserverPaused = false;
+    return changed;
 }
 
 function ensureToastContainer() {
@@ -1310,7 +1571,7 @@ function bindSettingsControls() {
     jQuery('#bbcv-open-settings-vault').on('click', () => openPanel('orbs'));
     jQuery('#bbcv-rescan').on('click', () => {
         const result = scanChat({ rebuild: false });
-        toastr?.success?.(`BB Collection Vault: +${result.addedOrbs.length} орбов, -${result.removedOrbs.length} удалено.`);
+        toastr?.success?.(`BB Collection Vault: +${result.addedOrbs.length} орбов, -${result.removedOrbs.length} орбов, +${result.addedAchievements.length} ачивок, -${result.removedAchievements.length} ачивок.`);
         syncSettingsControls();
     });
     jQuery('#bbcv-rebuild').on('click', () => {
@@ -1365,6 +1626,7 @@ function bindSettingsControls() {
         if (!store) return;
         store.orbs = [];
         store.achievements = [];
+        store.achievementSources = [];
         persistChat();
         renderFloatingButton();
         renderPanel();
@@ -1634,7 +1896,7 @@ function renderOrbsView(orbs) {
         uiState.rarityFilter = String(event.target.value || 'all');
         renderPanel();
     });
-    root.querySelector('#bbcv-panel-rescan')?.addEventListener('click', () => scanChat({ rebuild: true }));
+    root.querySelector('#bbcv-panel-rescan')?.addEventListener('click', () => scanChat({ rebuild: false }));
     root.querySelectorAll('.bbcv-orb-card').forEach((card) => {
         card.addEventListener('click', () => {
             uiState.selectedOrbHash = card.getAttribute('data-hash') || '';
@@ -1734,9 +1996,12 @@ function deleteAchievement(id) {
     const store = ensureStore();
     if (!store || !id) return;
     const target = store.achievements.find((achievement) => achievement.id === id || achievement.hash === id);
-    if (target?.hash) {
+    if (target) {
         const ignored = new Set(store.ignoredAchievementHashes || []);
-        ignored.add(target.hash);
+        if (target.id) ignored.add(target.id);
+        if (target.hash) ignored.add(target.hash);
+        if (target.sourceHash) ignored.add(target.sourceHash);
+        ignored.add(getAchievementSourceHash(target));
         store.ignoredAchievementHashes = [...ignored];
     }
     store.achievements = store.achievements.filter((achievement) => achievement.id !== id && achievement.hash !== id);
