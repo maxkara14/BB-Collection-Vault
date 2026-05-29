@@ -393,8 +393,34 @@ function parseKeyedOrbBlock(body) {
     if (!raw) return null;
 
     const textMatch = raw.match(/(?:^|\n)(?:Text|\u0422\u0435\u043a\u0441\u0442):\s*([\s\S]*)$/i);
-    const header = textMatch ? raw.slice(0, textMatch.index).trim() : raw;
-    const text = textMatch ? normalizeText(textMatch[1]) : '';
+    let header = textMatch ? raw.slice(0, textMatch.index).trim() : raw;
+    let text = textMatch ? normalizeText(textMatch[1]) : '';
+    if (!textMatch) {
+        const knownFields = new Set([
+            'orb_id',
+            'aura_source',
+            'character',
+            'palette_a',
+            'palette_b',
+            'palette_glow',
+            'rarity',
+            'fragment_type',
+            'fragment_length',
+            'title',
+        ]);
+        const lines = raw.split('\n');
+        let lastFieldIndex = -1;
+        for (let i = 0; i < lines.length; i += 1) {
+            const match = lines[i].match(/^([A-Za-z\u0410-\u042f\u0430-\u044f\u0401\u04510-9_ /-]{1,40}):\s*(.*)$/);
+            if (match && knownFields.has(match[1].trim().toLowerCase())) {
+                lastFieldIndex = i;
+            }
+        }
+        if (lastFieldIndex >= 0 && lastFieldIndex < lines.length - 1) {
+            header = lines.slice(0, lastFieldIndex + 1).join('\n').trim();
+            text = normalizeText(lines.slice(lastFieldIndex + 1).join('\n'));
+        }
+    }
     const fields = {};
 
     for (const line of header.split('\n')) {
@@ -595,10 +621,21 @@ function stripAchievementMarkersFromMessage(message) {
 
 function achievementContentKey(achievement) {
     return [
-        normalizeText(achievement?.title).toLowerCase(),
-        normalizeText(achievement?.description).toLowerCase(),
-        normalizeAchievementRarity(achievement?.rarity),
+        normalizeAchievementDedupeText(achievement?.title),
+        normalizeAchievementDedupeText(achievement?.description),
     ].join('|');
+}
+
+function normalizeAchievementDedupeText(value) {
+    return normalizeText(value)
+        .toLowerCase()
+        .replace(/[^\p{L}\p{N}\s]+/gu, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function achievementTitleKey(achievement) {
+    return normalizeAchievementDedupeText(achievement?.title);
 }
 
 function getAchievementSourceHash(achievement) {
@@ -868,7 +905,7 @@ function scanChat({ notify = false, rebuild = false } = {}) {
 
     const achievementCandidates = new Map();
     if (settings.achievementsEnabled) {
-        for (const source of getCurrentAchievementSources(store, visibleMessageKeys)) {
+        for (const source of getCurrentAchievementSources(store, existingMessageKeys)) {
             achievementCandidates.set(getAchievementSourceHash(source), source);
         }
         for (const parsedAchievements of parsedAchievementsByMessage.values()) {
@@ -883,6 +920,7 @@ function scanChat({ notify = false, rebuild = false } = {}) {
         : [];
     const knownAchievementHashes = new Set(store.achievements.map((achievement) => achievement.hash));
     const knownAchievementContent = new Set(store.achievements.map(achievementContentKey));
+    const knownAchievementTitles = new Set(store.achievements.map(achievementTitleKey).filter(Boolean));
     const addedOrbs = [];
     const addedAchievements = [];
     let addedAchievementSources = 0;
@@ -925,12 +963,15 @@ function scanChat({ notify = false, rebuild = false } = {}) {
             if (achievement.restoredFromSource) {
                 knownAchievementHashes.add(achievement.hash);
                 knownAchievementContent.add(achievementContentKey(achievement));
+                const titleKey = achievementTitleKey(achievement);
+                if (titleKey) knownAchievementTitles.add(titleKey);
                 store.achievements.push(achievement);
                 restoredAchievements += 1;
                 continue;
             }
             const contentKey = achievementContentKey(achievement);
-            if (settings.dedupeAchievements && knownAchievementContent.has(contentKey)) continue;
+            const titleKey = achievementTitleKey(achievement);
+            if (settings.dedupeAchievements && (knownAchievementContent.has(contentKey) || (titleKey && knownAchievementTitles.has(titleKey)))) continue;
             if (isAchievementBlockedByCooldown(achievement.messageIndex, lastAcceptedAchievementMessageIndex, settings)) {
                 if (settings.debugVerbose) {
                     console.info(`[${MODULE_NAME}] achievement skipped by local cooldown`, {
@@ -944,6 +985,7 @@ function scanChat({ notify = false, rebuild = false } = {}) {
             }
             knownAchievementHashes.add(achievement.hash);
             knownAchievementContent.add(contentKey);
+            if (titleKey) knownAchievementTitles.add(titleKey);
             if (upsertAchievementSource(store, achievement)) addedAchievementSources += 1;
             store.achievements.push(achievement);
             addedAchievements.push(achievement);
