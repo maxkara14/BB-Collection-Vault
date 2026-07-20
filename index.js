@@ -490,14 +490,18 @@ function getMessageStableKey(message, messageIndex, swipeId = message?.swipe_id 
     return key.replace(/\|/g, '') ? key : `message_${messageIndex}`;
 }
 
-function addExistingMessageKeys(targetSet, message, messageIndex) {
-    targetSet.add(getMessageStableKey(message, messageIndex));
-    if (!Array.isArray(message?.swipes)) return;
-    for (let swipeIndex = 0; swipeIndex < message.swipes.length; swipeIndex += 1) {
-        if (typeof message.swipes[swipeIndex] === 'string') {
-            targetSet.add(getMessageStableKey(message, messageIndex, swipeIndex));
-        }
-    }
+function getMessageKeyParts(messageKey) {
+    const parts = String(messageKey || '').split('|');
+    return {
+        hasStableParts: parts.length >= 5,
+        name: parts[3] || '',
+        swipeId: parts[4] || '',
+    };
+}
+
+function normalizeSwipeId(value) {
+    const text = String(value ?? '').trim();
+    return text || '0';
 }
 
 function getOrbContentHash(orb) {
@@ -584,39 +588,6 @@ function parseAchievementsFromMessage(message, messageIndex) {
         }
     }
     return results;
-}
-
-function stripAchievementMarkersFromText(text) {
-    const original = String(text ?? '');
-    if (!original.includes('[ACHIEVEMENT:')) return original;
-    ACHIEVEMENT_HIDE_REGEX.lastIndex = 0;
-    return original
-        .replace(ACHIEVEMENT_HIDE_REGEX, '')
-        .replace(/[ \t]+\n/g, '\n')
-        .replace(/\n{3,}/g, '\n\n')
-        .trimEnd();
-}
-
-function stripAchievementMarkersFromMessage(message) {
-    if (!message) return false;
-    let changed = false;
-    for (const key of ['mes', 'message']) {
-        if (typeof message[key] !== 'string') continue;
-        const next = stripAchievementMarkersFromText(message[key]);
-        if (next !== message[key]) {
-            message[key] = next;
-            changed = true;
-        }
-    }
-    const swipeIndex = Number(message.swipe_id);
-    if (Array.isArray(message.swipes) && Number.isInteger(swipeIndex) && typeof message.swipes[swipeIndex] === 'string') {
-        const next = stripAchievementMarkersFromText(message.swipes[swipeIndex]);
-        if (next !== message.swipes[swipeIndex]) {
-            message.swipes[swipeIndex] = next;
-            changed = true;
-        }
-    }
-    return changed;
 }
 
 function achievementContentKey(achievement) {
@@ -726,11 +697,37 @@ function migrateAchievementSourcesFromAchievements(store) {
     return changed;
 }
 
-function pruneMissingAchievementSources(store, currentMessageKeys) {
+function isAchievementSourceActive(source, activeMessageKeys, chat, parsedAchievementsByMessage) {
+    const messageKey = String(source?.messageKey || '');
+    if (!messageKey) return false;
+    if (activeMessageKeys.has(messageKey)) return true;
+
+    const messageIndex = Number(source.messageIndex);
+    if (!Number.isInteger(messageIndex) || messageIndex < 0 || messageIndex >= chat.length) return false;
+
+    const message = chat[messageIndex];
+    if (!message || message.is_user) return false;
+    // Raw markers are authoritative; the fallback below is only for stripped legacy markers.
+    if ((parsedAchievementsByMessage.get(messageIndex) || []).length) return false;
+
+    if (messageKey === `message_${messageIndex}`) return true;
+
+    const stored = getMessageKeyParts(messageKey);
+    if (!stored.hasStableParts) return false;
+
+    const active = getMessageKeyParts(getMessageStableKey(message, messageIndex));
+    if (stored.name && active.name && stored.name !== active.name) return false;
+
+    const storedSwipeId = normalizeSwipeId(stored.swipeId);
+    const activeSwipeId = normalizeSwipeId(message.swipe_id ?? active.swipeId);
+    return storedSwipeId === activeSwipeId;
+}
+
+function pruneMissingAchievementSources(store, activeMessageKeys, chat, parsedAchievementsByMessage) {
     const removed = [];
     const kept = [];
     for (const source of store.achievementSources) {
-        if (source?.messageKey && currentMessageKeys.has(String(source.messageKey))) {
+        if (isAchievementSourceActive(source, activeMessageKeys, chat, parsedAchievementsByMessage)) {
             kept.push(source);
         } else {
             removed.push(source);
@@ -742,9 +739,9 @@ function pruneMissingAchievementSources(store, currentMessageKeys) {
     return removed;
 }
 
-function getCurrentAchievementSources(store, currentMessageKeys) {
+function getCurrentAchievementSources(store, activeMessageKeys, chat, parsedAchievementsByMessage) {
     return store.achievementSources
-        .filter((source) => source?.messageKey && currentMessageKeys.has(String(source.messageKey)))
+        .filter((source) => isAchievementSourceActive(source, activeMessageKeys, chat, parsedAchievementsByMessage))
         .map((source) => achievementFromSource({ ...source, restoredFromSource: true }))
         .filter((achievement) => achievement.title && achievement.description);
 }
@@ -757,11 +754,7 @@ function pruneMissingAchievements(store, currentSourceHashes) {
             kept.push(achievement);
             continue;
         }
-        if (!achievement.messageKey) {
-            kept.push(achievement);
-            continue;
-        }
-        if (!achievement.sourceHash) {
+        if (!achievement.messageKey || !achievement.sourceHash) {
             kept.push(achievement);
             continue;
         }
@@ -776,6 +769,22 @@ function pruneMissingAchievements(store, currentSourceHashes) {
         store.achievements = kept;
     }
     return removed;
+}
+
+function syncAchievementMessageIndexes(store, currentMessageIndexes) {
+    if (!store || !currentMessageIndexes?.size) return 0;
+    let changed = 0;
+    for (const collection of [store.achievementSources, store.achievements]) {
+        if (!Array.isArray(collection)) continue;
+        for (const achievement of collection) {
+            if (achievement?.source !== 'chat' || !achievement.messageKey) continue;
+            const messageIndex = currentMessageIndexes.get(String(achievement.messageKey));
+            if (messageIndex === undefined || achievement.messageIndex === messageIndex) continue;
+            achievement.messageIndex = messageIndex;
+            changed += 1;
+        }
+    }
+    return changed;
 }
 
 function getLastAcceptedChatAchievementIndex(store = ensureStore()) {
@@ -836,13 +845,21 @@ function grantVaultAchievement(input, notify = false) {
 
 function checkMilestones(notify = false) {
     const store = ensureStore();
-    if (!store) return;
+    if (!store) return [];
     const stats = getStats(store);
+    const removed = [];
     for (const milestone of MILESTONES) {
         if (milestone.when(stats)) {
             grantVaultAchievement(milestone, notify);
+            continue;
+        }
+        const removedMilestones = store.achievements.filter((achievement) => achievement.id === milestone.id);
+        if (removedMilestones.length) {
+            removed.push(...removedMilestones);
+            store.achievements = store.achievements.filter((achievement) => achievement.id !== milestone.id);
         }
     }
+    return removed;
 }
 
 function shouldNotifyOrb(orb) {
@@ -861,22 +878,20 @@ function scanChat({ notify = false, rebuild = false } = {}) {
 
     if (rebuild) {
         store.orbs = [];
-        // Achievement markers are stripped from saved messages after collection.
-        // Keep stored achievements and prune only entries with live source links below.
     }
 
     const chat = Array.isArray(context.chat) ? context.chat : [];
     const parsedOrbsByMessage = new Map();
     const parsedAchievementsByMessage = new Map();
     const currentOrbKeys = new Set();
-    const visibleMessageKeys = new Set();
-    const existingMessageKeys = new Set();
+    const activeMessageKeys = new Set();
+    const activeMessageIndexes = new Map();
     for (let i = 0; i < chat.length; i += 1) {
         const message = chat[i];
         if (!message || message.is_user) continue;
-        visibleMessageKeys.add(getMessageStableKey(message, i));
-        addExistingMessageKeys(existingMessageKeys, message, i);
-
+        const messageKey = getMessageStableKey(message, i);
+        activeMessageKeys.add(messageKey);
+        activeMessageIndexes.set(messageKey, i);
         if (settings.collectOrbs) {
             const parsedOrbs = parseOrbsFromMessage(message, i);
             parsedOrbsByMessage.set(i, parsedOrbs);
@@ -893,8 +908,11 @@ function scanChat({ notify = false, rebuild = false } = {}) {
         ? migrateAchievementSourcesFromAchievements(store)
         : 0;
     const removedAchievementSources = settings.achievementsEnabled
-        ? pruneMissingAchievementSources(store, existingMessageKeys)
+        ? pruneMissingAchievementSources(store, activeMessageKeys, chat, parsedAchievementsByMessage)
         : [];
+    const updatedAchievementMessageIndexes = settings.achievementsEnabled
+        ? syncAchievementMessageIndexes(store, activeMessageIndexes)
+        : 0;
     const ignoredOrbHashes = new Set(store.ignoredOrbHashes || []);
     const ignoredAchievementHashes = new Set(store.ignoredAchievementHashes || []);
     const knownOrbHashes = new Set();
@@ -905,7 +923,8 @@ function scanChat({ notify = false, rebuild = false } = {}) {
 
     const achievementCandidates = new Map();
     if (settings.achievementsEnabled) {
-        for (const source of getCurrentAchievementSources(store, existingMessageKeys)) {
+        for (const source of getCurrentAchievementSources(store, activeMessageKeys, chat, parsedAchievementsByMessage)) {
+            source.messageIndex = activeMessageIndexes.get(String(source.messageKey)) ?? source.messageIndex;
             achievementCandidates.set(getAchievementSourceHash(source), source);
         }
         for (const parsedAchievements of parsedAchievementsByMessage.values()) {
@@ -915,7 +934,7 @@ function scanChat({ notify = false, rebuild = false } = {}) {
         }
     }
     const currentAchievementSourceHashes = new Set(achievementCandidates.keys());
-    const removedAchievements = settings.achievementsEnabled
+    let removedAchievements = settings.achievementsEnabled
         ? pruneMissingAchievements(store, currentAchievementSourceHashes)
         : [];
     const knownAchievementHashes = new Set(store.achievements.map((achievement) => achievement.hash));
@@ -925,7 +944,6 @@ function scanChat({ notify = false, rebuild = false } = {}) {
     const addedAchievements = [];
     let addedAchievementSources = 0;
     let restoredAchievements = 0;
-    let strippedAchievementMarkers = 0;
     let lastAcceptedAchievementMessageIndex = getLastAcceptedChatAchievementIndex(store);
 
     for (let i = 0; i < chat.length; i += 1) {
@@ -942,11 +960,6 @@ function scanChat({ notify = false, rebuild = false } = {}) {
             }
         }
 
-        if (settings.achievementsEnabled) {
-            if (stripAchievementMarkersFromMessage(message)) {
-                strippedAchievementMarkers += 1;
-            }
-        }
     }
 
     if (settings.achievementsEnabled) {
@@ -991,16 +1004,17 @@ function scanChat({ notify = false, rebuild = false } = {}) {
             addedAchievements.push(achievement);
             lastAcceptedAchievementMessageIndex = Number(achievement.messageIndex);
         }
+
     }
 
-    if (addedOrbs.length || addedAchievements.length || addedAchievementSources || restoredAchievements || migratedAchievementSources || removedOrbs.length || removedAchievements.length || removedAchievementSources.length || strippedAchievementMarkers || rebuild) {
+    if (settings.collectOrbs && settings.achievementsEnabled) {
+        removedAchievements = removedAchievements.concat(checkMilestones(notify));
+    }
+
+    if (addedOrbs.length || addedAchievements.length || addedAchievementSources || restoredAchievements || migratedAchievementSources || updatedAchievementMessageIndexes || removedOrbs.length || removedAchievements.length || removedAchievementSources.length || rebuild) {
         store.orbs.sort((a, b) => Number(a.createdAt || 0) - Number(b.createdAt || 0));
         store.achievements.sort((a, b) => Number(a.createdAt || 0) - Number(b.createdAt || 0));
         persistChat();
-    }
-
-    if (addedOrbs.length) {
-        checkMilestones(notify);
     }
 
     if (notify) {
@@ -1012,8 +1026,8 @@ function scanChat({ notify = false, rebuild = false } = {}) {
         }
     }
 
-    if (settings.debugVerbose && (addedOrbs.length || addedAchievements.length || addedAchievementSources || restoredAchievements || migratedAchievementSources || removedOrbs.length || removedAchievements.length || removedAchievementSources.length || strippedAchievementMarkers || rebuild)) {
-        console.info(`[${MODULE_NAME}] scan`, { rebuild, addedOrbs, removedOrbs, addedAchievements, restoredAchievements, migratedAchievementSources, removedAchievements, removedAchievementSources, strippedAchievementMarkers, stats: getStats(store) });
+    if (settings.debugVerbose && (addedOrbs.length || addedAchievements.length || addedAchievementSources || restoredAchievements || migratedAchievementSources || updatedAchievementMessageIndexes || removedOrbs.length || removedAchievements.length || removedAchievementSources.length || rebuild)) {
+        console.info(`[${MODULE_NAME}] scan`, { rebuild, addedOrbs, removedOrbs, addedAchievements, restoredAchievements, migratedAchievementSources, updatedAchievementMessageIndexes, removedAchievements, removedAchievementSources, stats: getStats(store) });
     }
 
     renderFloatingButton();
