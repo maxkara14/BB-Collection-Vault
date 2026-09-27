@@ -82,6 +82,7 @@ const DEFAULT_SETTINGS = {
     orbToastRarities: ['Rare', 'Anomaly'],
     dedupeAchievements: true,
     appearanceTheme: 'midnight',
+    orbStyle: 'prism',
     accentColor: '#8fdcff',
     panelDensity: 'cozy',
     toastCorner: 'top_right',
@@ -102,6 +103,7 @@ const DEFAULT_SETTINGS = {
 const ORB_RARITIES = ['Common', 'Uncommon', 'Rare', 'Anomaly'];
 const ACHIEVEMENT_RARITIES = ['common', 'rare', 'epic', 'legendary'];
 const APPEARANCE_THEMES = ['midnight', 'glass', 'ember', 'mono'];
+const ORB_STYLES = ['prism', 'core'];
 const PANEL_DENSITIES = ['compact', 'cozy', 'wide'];
 const TOAST_CORNERS = ['top_right', 'top_left', 'bottom_right', 'bottom_left'];
 const FAB_VIEWPORT_MARGIN = 8;
@@ -188,6 +190,9 @@ function getSettings() {
     }
     if (!APPEARANCE_THEMES.includes(String(settings.appearanceTheme))) {
         settings.appearanceTheme = DEFAULT_SETTINGS.appearanceTheme;
+    }
+    if (!ORB_STYLES.includes(String(settings.orbStyle))) {
+        settings.orbStyle = DEFAULT_SETTINGS.orbStyle;
     }
     if (!PANEL_DENSITIES.includes(String(settings.panelDensity))) {
         settings.panelDensity = DEFAULT_SETTINGS.panelDensity;
@@ -385,6 +390,7 @@ function applyAppearance() {
         root.classList.toggle('bbcv-theme-glass', settings.appearanceTheme === 'glass');
         root.classList.toggle('bbcv-theme-ember', settings.appearanceTheme === 'ember');
         root.classList.toggle('bbcv-theme-mono', settings.appearanceTheme === 'mono');
+        root.classList.toggle('bbcv-orb-style-core', settings.orbStyle === 'core');
     }
 }
 
@@ -1446,6 +1452,12 @@ function renderSettings() {
                                     <option value="wide">Просторно</option>
                                 </select>
                             </label>
+                            <label class="bbcv-field">Стиль орбов
+                                <select id="bbcv-orb-style" class="text_pole">
+                                    <option value="prism">Призма</option>
+                                    <option value="core">Ядро</option>
+                                </select>
+                            </label>
                             <label class="bbcv-field">Акцентный цвет коллекции
                                 <input id="bbcv-accent-color" class="text_pole" type="color">
                             </label>
@@ -1522,6 +1534,7 @@ function syncSettingsControls() {
     jQuery('#bbcv-achievement-prompt').val(settings.achievementPrompt);
     jQuery('#bbcv-negative-achievement-prompt').val(settings.negativeAchievementPrompt);
     jQuery('#bbcv-appearance-theme').val(settings.appearanceTheme);
+    jQuery('#bbcv-orb-style').val(settings.orbStyle);
     jQuery('#bbcv-accent-color').val(settings.accentColor);
     jQuery('#bbcv-panel-density').val(settings.panelDensity);
     jQuery('#bbcv-toast-corner').val(settings.toastCorner);
@@ -1581,6 +1594,10 @@ function bindSettingsControls() {
     });
     jQuery('#bbcv-appearance-theme').on('change', function onChange() {
         settings.appearanceTheme = String(this.value || DEFAULT_SETTINGS.appearanceTheme);
+        saveAndRefresh();
+    });
+    jQuery('#bbcv-orb-style').on('change', function onChange() {
+        settings.orbStyle = ORB_STYLES.includes(this.value) ? this.value : DEFAULT_SETTINGS.orbStyle;
         saveAndRefresh();
     });
     jQuery('#bbcv-accent-color').on('input change', function onChange() {

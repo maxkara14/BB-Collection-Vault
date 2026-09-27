@@ -442,6 +442,48 @@
         0 0 18px var(--g);
 }
 
+.bbcv-orb-style-core .bbcv-mini-orb,
+.bbcv-orb-style-core .bbcv-large-orb,
+.bbcv-orb-style-core .bbcv-toast-orb-icon {
+    position: relative;
+    isolation: isolate;
+    background:
+        radial-gradient(circle at 34% 28%, #fff 0 4%, var(--g) 12%, transparent 34%),
+        radial-gradient(circle at 68% 70%, var(--b), transparent 58%),
+        radial-gradient(circle, var(--a), #111827 78%);
+    box-shadow: 0 0 10px var(--g), 0 0 20px var(--a);
+}
+
+.bbcv-orb-style-core .bbcv-mini-orb::before,
+.bbcv-orb-style-core .bbcv-large-orb::before,
+.bbcv-orb-style-core .bbcv-toast-orb-icon::before,
+.bbcv-orb-style-core .bbcv-mini-orb::after,
+.bbcv-orb-style-core .bbcv-large-orb::after,
+.bbcv-orb-style-core .bbcv-toast-orb-icon::after {
+    content: '';
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+}
+
+.bbcv-orb-style-core .bbcv-mini-orb::before,
+.bbcv-orb-style-core .bbcv-large-orb::before,
+.bbcv-orb-style-core .bbcv-toast-orb-icon::before {
+    inset: -2px;
+    border: 1px solid var(--g);
+    opacity: 0.65;
+}
+
+.bbcv-orb-style-core .bbcv-mini-orb::after,
+.bbcv-orb-style-core .bbcv-large-orb::after,
+.bbcv-orb-style-core .bbcv-toast-orb-icon::after {
+    inset: -4px;
+    border: 1px solid var(--a);
+    border-left-color: transparent;
+    border-right-color: transparent;
+    opacity: 0.8;
+}
+
 .bbcv-mini-orb {
     width: 44px;
     height: 44px;

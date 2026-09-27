@@ -1,7 +1,7 @@
 {
     "display_name": "BB Collection Vault",
     "name": "bb-collection-vault",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "Коллекция лор-орбов и редких ачивок для важных моментов ролки.",
     "author": "BruniikBron",
     "js": "index.js",
