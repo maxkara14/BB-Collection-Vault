@@ -270,6 +270,16 @@ function normalizeText(value) {
     return String(value ?? '').replace(/\r/g, '').replace(/\s+\n/g, '\n').trim();
 }
 
+function normalizeDisplaySpaces(value) {
+    // Display/search only: stored text participates in identity hashes and ignored records.
+    // Preserve line breaks, tabs and ZWJ/ZWNJ used by emoji and writing systems.
+    return String(value ?? '').replace(/[\u00A0\u1680\u2000-\u200B\u202F\u205F\u2800\u3000\uFEFF\u115F\u1160\u3164\uFFA0]/g, ' ');
+}
+
+function escapeDisplayText(value) {
+    return escapeHtml(normalizeDisplaySpaces(value));
+}
+
 function escapeHtml(value) {
     return String(value ?? '')
         .replace(/&/g, '&amp;')
@@ -1304,8 +1314,8 @@ function showOrbToast(orb) {
         <div class="bbcv-toast-orb-icon" style="--a:${escapeHtml(orb.paletteA)};--b:${escapeHtml(orb.paletteB)};--g:${escapeHtml(orb.paletteGlow)}"></div>
         <div class="bbcv-toast-copy">
             <div class="bbcv-toast-kicker">Орб добавлен в коллекцию</div>
-            <div class="bbcv-toast-title">${escapeHtml(orb.title)}</div>
-            <div class="bbcv-toast-desc">${escapeHtml(orb.source)} · ${escapeHtml(orb.fragmentType)}</div>
+            <div class="bbcv-toast-title">${escapeDisplayText(orb.title)}</div>
+            <div class="bbcv-toast-desc">${escapeDisplayText(orb.source)} · ${escapeDisplayText(orb.fragmentType)}</div>
         </div>
     `, `bbcv-toast-rarity-${orb.rarity.toLowerCase()}`);
 }
@@ -1313,11 +1323,11 @@ function showOrbToast(orb) {
 function showAchievementToast(achievement) {
     playNotificationSound('achievement');
     showToast(`
-        <div class="bbcv-toast-achievement-icon">${escapeHtml(achievement.emoji || '🏆')}</div>
+        <div class="bbcv-toast-achievement-icon">${escapeDisplayText(achievement.emoji || '🏆')}</div>
         <div class="bbcv-toast-copy">
             <div class="bbcv-toast-kicker">ДОСТИЖЕНИЕ ПОЛУЧЕНО</div>
-            <div class="bbcv-toast-title">${escapeHtml(achievement.title)}</div>
-            <div class="bbcv-toast-desc">${escapeHtml(achievement.description)}</div>
+            <div class="bbcv-toast-title">${escapeDisplayText(achievement.title)}</div>
+            <div class="bbcv-toast-desc">${escapeDisplayText(achievement.description)}</div>
         </div>
     `, `bbcv-toast-achievement bbcv-achievement-${achievement.rarity}`);
 }
@@ -1899,13 +1909,13 @@ function closePanel() {
 }
 
 function getFilteredOrbs(orbs) {
-    const query = uiState.search.toLowerCase();
+    const query = normalizeDisplaySpaces(uiState.search).toLowerCase();
     return orbs
         .filter((orb) => uiState.rarityFilter === 'all' || orb.rarity === uiState.rarityFilter)
         .filter((orb) => {
             if (!query) return true;
             return [orb.title, orb.source, orb.fragmentType, orb.text, orb.rarity]
-                .some((value) => String(value || '').toLowerCase().includes(query));
+                .some((value) => normalizeDisplaySpaces(value).toLowerCase().includes(query));
         })
         .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
 }
@@ -1943,7 +1953,7 @@ function renderOrbsView(orbs) {
         <div class="bbcv-toolbar">
             <label class="bbcv-search">
                 <i class="fa-solid fa-magnifying-glass"></i>
-                <input id="bbcv-orb-search" type="search" placeholder="Поиск по источнику, типу, тексту..." value="${escapeHtml(uiState.search)}">
+                <input id="bbcv-orb-search" type="search" placeholder="Поиск по источнику, типу, тексту..." value="${escapeDisplayText(uiState.search)}">
             </label>
             <select id="bbcv-orb-rarity-filter" class="text_pole">
                 <option value="all">Все редкости</option>
@@ -1989,8 +1999,8 @@ function renderOrbCard(orb) {
             style="--a:${escapeHtml(orb.paletteA)};--b:${escapeHtml(orb.paletteB)};--g:${escapeHtml(orb.paletteGlow)}">
             <span class="bbcv-mini-orb"></span>
             <span class="bbcv-orb-card-copy">
-                <span class="bbcv-orb-card-title">${escapeHtml(orb.title)}</span>
-                <span class="bbcv-orb-card-meta">${escapeHtml(orb.rarity)} · ${escapeHtml(orb.fragmentType)}</span>
+                <span class="bbcv-orb-card-title">${escapeDisplayText(orb.title)}</span>
+                <span class="bbcv-orb-card-meta">${escapeDisplayText(orb.rarity)} · ${escapeDisplayText(orb.fragmentType)}</span>
             </span>
         </button>
     `;
@@ -2001,12 +2011,12 @@ function renderOrbDetail(orb) {
         <div class="bbcv-orb-detail-head" style="--a:${escapeHtml(orb.paletteA)};--b:${escapeHtml(orb.paletteB)};--g:${escapeHtml(orb.paletteGlow)}">
             <div class="bbcv-large-orb"></div>
             <div>
-                <div class="bbcv-detail-kicker">${escapeHtml(orb.rarity)} · ${escapeHtml(orb.fragmentType)}</div>
-                <h3>${escapeHtml(orb.title)}</h3>
-                <div class="bbcv-detail-source">${escapeHtml(orb.source)}</div>
+                <div class="bbcv-detail-kicker">${escapeDisplayText(orb.rarity)} · ${escapeDisplayText(orb.fragmentType)}</div>
+                <h3>${escapeDisplayText(orb.title)}</h3>
+                <div class="bbcv-detail-source">${escapeDisplayText(orb.source)}</div>
             </div>
         </div>
-        <div class="bbcv-detail-text">${escapeHtml(orb.text || 'Текст фрагмента пуст.').replace(/\n/g, '<br>')}</div>
+        <div class="bbcv-detail-text">${escapeDisplayText(orb.text || 'Текст фрагмента пуст.').replace(/\n/g, '<br>')}</div>
         <div class="bbcv-detail-foot">
             <span>${escapeHtml(formatDate(orb.createdAt))}</span>
             <button id="bbcv-delete-selected-orb" class="menu_button danger bbcv-icon-text" type="button"><i class="fa-solid fa-trash"></i><span>Удалить</span></button>
@@ -2034,12 +2044,12 @@ function renderAchievementsView(achievements) {
 
 function renderAchievementItem(item) {
     return `
-        <article class="bbcv-achievement-item bbcv-achievement-${escapeHtml(item.rarity)}">
-            <div class="bbcv-achievement-emoji">${escapeHtml(item.emoji || '🏆')}</div>
+        <article class="bbcv-achievement-item bbcv-achievement-${escapeDisplayText(item.rarity)}">
+            <div class="bbcv-achievement-emoji">${escapeDisplayText(item.emoji || '🏆')}</div>
             <div class="bbcv-achievement-copy">
-                <div class="bbcv-achievement-title">${escapeHtml(item.title)}</div>
-                <div class="bbcv-achievement-desc">${escapeHtml(item.description)}</div>
-                <div class="bbcv-achievement-meta">${escapeHtml(item.rarity)} · ${escapeHtml(item.source === 'vault' ? 'Коллекция' : 'Чат')} · ${escapeHtml(formatDate(item.createdAt))}</div>
+                <div class="bbcv-achievement-title">${escapeDisplayText(item.title)}</div>
+                <div class="bbcv-achievement-desc">${escapeDisplayText(item.description)}</div>
+                <div class="bbcv-achievement-meta">${escapeDisplayText(item.rarity)} · ${escapeHtml(item.source === 'vault' ? 'Коллекция' : 'Чат')} · ${escapeHtml(formatDate(item.createdAt))}</div>
             </div>
             <button class="bbcv-icon-button bbcv-achievement-delete" type="button" title="Удалить ачивку" data-achievement-id="${escapeHtml(item.id)}">
                 <i class="fa-solid fa-trash"></i>
